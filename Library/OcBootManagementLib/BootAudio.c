@@ -200,21 +200,15 @@ OcPlayAudioEntry (
     OcPlayAudioFile (Context, OC_VOICE_OVER_AUDIO_FILE_WINDOWS, OC_VOICE_OVER_AUDIO_BASE_TYPE_OPEN_CORE, FALSE);
   } else if (Entry->Type == OC_BOOT_EXTERNAL_OS) {
     OcPlayAudioFile (Context, OC_VOICE_OVER_AUDIO_FILE_EXTERNAL_OS, OC_VOICE_OVER_AUDIO_BASE_TYPE_OPEN_CORE, FALSE);
-  } else if (Entry->Type == OC_BOOT_RESET_NVRAM) {
-    OcPlayAudioFile (Context, OC_VOICE_OVER_AUDIO_FILE_RESET_NVRAM, OC_VOICE_OVER_AUDIO_BASE_TYPE_OPEN_CORE, FALSE);
-  } else if (Entry->Type == OC_BOOT_TOGGLE_SIP) {
-    ASSERT (
-      StrCmp (Entry->Name, OC_MENU_SIP_IS_DISABLED) == 0 ||
-      StrCmp (Entry->Name, OC_MENU_SIP_IS_ENABLED) == 0
-      );
-    if (StrCmp (Entry->Name, OC_MENU_SIP_IS_DISABLED) == 0) {
-      OcPlayAudioFile (Context, OC_VOICE_OVER_AUDIO_FILE_SIP_IS_DISABLED, OC_VOICE_OVER_AUDIO_BASE_TYPE_OPEN_CORE, FALSE);
-    } else {
-      OcPlayAudioFile (Context, OC_VOICE_OVER_AUDIO_FILE_SIP_IS_ENABLED, OC_VOICE_OVER_AUDIO_BASE_TYPE_OPEN_CORE, FALSE);
-    }
+  } else if (Entry->Type == OC_BOOT_SYSTEM) {
+    OcPlayAudioFile (Context, Entry->AudioBasePath, Entry->AudioBaseType, FALSE);
   } else if (Entry->Type == OC_BOOT_EXTERNAL_TOOL) {
     if (OcAsciiStriStr (Entry->Flavour, OC_FLAVOUR_ID_RESET_NVRAM) != NULL) {
       OcPlayAudioFile (Context, OC_VOICE_OVER_AUDIO_FILE_RESET_NVRAM, OC_VOICE_OVER_AUDIO_BASE_TYPE_OPEN_CORE, FALSE);
+    } else if (OcAsciiStriStr (Entry->Flavour, OC_FLAVOUR_ID_TOGGLE_SIP_ENABLED) != NULL) {
+      OcPlayAudioFile (Context, OC_VOICE_OVER_AUDIO_FILE_SIP_IS_ENABLED, OC_VOICE_OVER_AUDIO_BASE_TYPE_OPEN_CORE, FALSE);
+    } else if (OcAsciiStriStr (Entry->Flavour, OC_FLAVOUR_ID_TOGGLE_SIP_DISABLED) != NULL) {
+      OcPlayAudioFile (Context, OC_VOICE_OVER_AUDIO_FILE_SIP_IS_DISABLED, OC_VOICE_OVER_AUDIO_BASE_TYPE_OPEN_CORE, FALSE);
     } else if (OcAsciiStriStr (Entry->Flavour, OC_FLAVOUR_ID_UEFI_SHELL) != NULL) {
       OcPlayAudioFile (Context, OC_VOICE_OVER_AUDIO_FILE_UEFI_SHELL, OC_VOICE_OVER_AUDIO_BASE_TYPE_OPEN_CORE, FALSE);
     } else {

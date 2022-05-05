@@ -188,7 +188,7 @@ OcRunBootPicker (
   // This function should not return under normal conditions.
   //
   if (Context->PickerCommand == OcPickerResetNvram) {
-    return InternalSystemActionResetNvram ();
+    return OcResetNvram (FALSE);
   }
 
   KeyMap = OcAppleKeyMapInstallProtocols (FALSE);

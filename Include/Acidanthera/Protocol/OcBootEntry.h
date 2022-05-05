@@ -28,7 +28,7 @@
 
   WARNING: This protocol is currently undergoing active design.
 **/
-#define OC_BOOT_ENTRY_PROTOCOL_REVISION  1
+#define OC_BOOT_ENTRY_PROTOCOL_REVISION  2
 
 /**
   Forward declaration of OC_BOOT_ENTRY_PROTOCOL structure.
@@ -89,8 +89,19 @@ VOID
   The structure exposed by the OC_BOOT_ENTRY_PROTOCOL.
 **/
 struct OC_BOOT_ENTRY_PROTOCOL_ {
+  //
+  // Protocol revision.
+  //
   UINTN                   Revision;
+  //
+  // Get boot entries.
+  //
   OC_GET_BOOT_ENTRIES     GetBootEntries;
+  //
+  // Free boot entries.
+  // Optional, NULL may set here by a protocol provider if the returned
+  // entries are in statically allocated memory and do not need freeing.
+  //
   OC_FREE_BOOT_ENTRIES    FreeBootEntries;
 };
 

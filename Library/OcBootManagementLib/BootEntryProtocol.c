@@ -176,10 +176,12 @@ AddEntriesFromBootEntryProtocol (
       }
     }
 
-    BootEntryProtocol->FreeBootEntries (
-                         &Entries,
-                         NumEntries
-                         );
+    if (BootEntryProtocol->FreeBootEntries) {
+      BootEntryProtocol->FreeBootEntries (
+                           &Entries,
+                           NumEntries
+                           );
+    }
 
     //
     // If not found, keep hunting for default entry on other installed drivers.

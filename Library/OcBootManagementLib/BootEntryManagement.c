@@ -296,7 +296,7 @@ RegisterBootOption (
   //
   // For tools and system options we are done.
   //
-  if ((BootEntry->Type & (OC_BOOT_SYSTEM | OC_BOOT_EXTERNAL_TOOL)) != 0) {
+  if ((BootEntry->Type & (OC_BOOT_EXTERNAL_TOOL | OC_BOOT_SYSTEM)) != 0) {
     return;
   }
 
@@ -612,18 +612,26 @@ InternalAddBootEntryFromCustomEntry (
     }
   }
 
+  ASSERT (CustomEntry->Name != NULL);
   BootEntry->Name = AsciiStrCopyToUnicode (CustomEntry->Name, 0);
   if (BootEntry->Name == NULL) {
     FreeBootEntry (BootEntry);
     return EFI_OUT_OF_RESOURCES;
   }
 
-  PathName = AsciiStrCopyToUnicode (CustomEntry->Path, 0);
-  if (PathName == NULL) {
-    FreeBootEntry (BootEntry);
-    return EFI_OUT_OF_RESOURCES;
+  if (!CustomEntry->SystemAction) {
+    ASSERT (CustomEntry->Path != NULL);
+    PathName = AsciiStrCopyToUnicode (CustomEntry->Path, 0);
+    if (PathName == NULL) {
+      FreeBootEntry (BootEntry);
+      return EFI_OUT_OF_RESOURCES;
+    }
+  } else {
+    ASSERT (CustomEntry->Path == NULL);
+    PathName = NULL;
   }
 
+  ASSERT (CustomEntry->Flavour != NULL);
   BootEntry->Flavour = AllocateCopyPool (AsciiStrSize (CustomEntry->Flavour), CustomEntry->Flavour);
   if (BootEntry->Flavour == NULL) {
     FreeBootEntry (BootEntry);
@@ -634,12 +642,20 @@ InternalAddBootEntryFromCustomEntry (
     DEBUG_INFO,
     "OCB: Adding custom entry %s (%a|B:%d) -> %a\n",
     BootEntry->Name,
-    CustomEntry->Tool ? "tool" : "os",
+    CustomEntry->SystemAction != NULL ? "action" : (CustomEntry->Tool ? "tool" : "os"),
     IsBootEntryProtocol,
     CustomEntry->Path
     ));
 
-  if (CustomEntry->Tool) {
+  if (CustomEntry->SystemAction) {
+    BootEntry->Type = OC_BOOT_SYSTEM;
+
+    BootEntry->SystemAction = CustomEntry->SystemAction;
+    BootEntry->ActionConfig = CustomEntry->ActionConfig;
+
+    BootEntry->AudioBasePath = CustomEntry->AudioBasePath;
+    BootEntry->AudioBaseType = CustomEntry->AudioBaseType;
+  } else if (CustomEntry->Tool) {
     BootEntry->Type = OC_BOOT_EXTERNAL_TOOL;
     UnicodeUefiSlashes (PathName);
     BootEntry->PathName = PathName;
@@ -746,20 +762,25 @@ InternalAddBootEntryFromCustomEntry (
   BootEntry->LaunchInText     = CustomEntry->TextMode;
   BootEntry->ExposeDevicePath = CustomEntry->RealPath;
 
-  BootEntry->LoadOptionsSize = (UINT32)AsciiStrLen (CustomEntry->Arguments);
-  if (BootEntry->LoadOptionsSize > 0) {
-    BootEntry->LoadOptions = AllocateCopyPool (
-                               BootEntry->LoadOptionsSize + 1,
-                               CustomEntry->Arguments
-                               );
-    if (BootEntry->LoadOptions == NULL) {
-      BootEntry->LoadOptionsSize = 0;
+  if (BootEntry->SystemAction != NULL) {
+    ASSERT (CustomEntry->Arguments == NULL);
+  } else {
+    ASSERT (CustomEntry->Arguments != NULL);
+    BootEntry->LoadOptionsSize = (UINT32)AsciiStrLen (CustomEntry->Arguments);
+    if (BootEntry->LoadOptionsSize > 0) {
+      BootEntry->LoadOptions = AllocateCopyPool (
+                                 BootEntry->LoadOptionsSize + 1,
+                                 CustomEntry->Arguments
+                                 );
+      if (BootEntry->LoadOptions == NULL) {
+        BootEntry->LoadOptionsSize = 0;
+      }
     }
   }
 
   BootEntry->IsCustom            = TRUE;
   BootEntry->IsBootEntryProtocol = IsBootEntryProtocol;
-  if (IsBootEntryProtocol) {
+  if (IsBootEntryProtocol && (BootEntry->SystemAction == NULL)) {
     PartitionEntry = OcGetGptPartitionEntry (FileSystem->Handle);
     if (PartitionEntry == NULL) {
       CopyGuid (&BootEntry->UniquePartitionGUID, &gEfiPartTypeUnusedGuid);
@@ -767,70 +788,6 @@ InternalAddBootEntryFromCustomEntry (
       CopyGuid (&BootEntry->UniquePartitionGUID, &PartitionEntry->UniquePartitionGUID);
     }
   }
-
-  RegisterBootOption (
-    BootContext,
-    FileSystem,
-    BootEntry
-    );
-
-  return EFI_SUCCESS;
-}
-
-/**
-  Create bootable entry from system entry.
-
-  @param[in,out] BootContext   Context of filesystems.
-  @param[in,out] FileSystem    Filesystem to add custom entry.
-  @param[in]     Name          System entry name.
-  @param[in]     Type          System entry type.
-  @param[in]     Flavour       System entry flavour.
-  @param[in]     Action        System entry action.
-
-  @retval EFI_SUCCESS on success.
-**/
-STATIC
-EFI_STATUS
-AddBootEntryFromSystemEntry (
-  IN OUT OC_BOOT_CONTEXT        *BootContext,
-  IN OUT OC_BOOT_FILESYSTEM     *FileSystem,
-  IN     CONST CHAR16           *Name,
-  IN     OC_BOOT_ENTRY_TYPE     Type,
-  IN     CONST CHAR8            *Flavour,
-  IN     OC_BOOT_SYSTEM_ACTION  Action
-  )
-{
-  OC_BOOT_ENTRY  *BootEntry;
-
-  if (BootContext->PickerContext->HideAuxiliary) {
-    return EFI_UNSUPPORTED;
-  }
-
-  DEBUG ((DEBUG_INFO, "OCB: Adding system entry %s\n", Name));
-
-  //
-  // Allocate, initialise, and describe boot entry.
-  //
-  BootEntry = AllocateZeroPool (sizeof (*BootEntry));
-  if (BootEntry == NULL) {
-    return EFI_OUT_OF_RESOURCES;
-  }
-
-  BootEntry->Name = AllocateCopyPool (StrSize (Name), Name);
-  if (BootEntry->Name == NULL) {
-    FreePool (BootEntry);
-    return EFI_OUT_OF_RESOURCES;
-  }
-
-  BootEntry->Flavour = AllocateCopyPool (AsciiStrSize (Flavour), Flavour);
-  if (BootEntry->Flavour == NULL) {
-    FreePool (BootEntry->Name);
-    FreePool (BootEntry);
-    return EFI_OUT_OF_RESOURCES;
-  }
-
-  BootEntry->Type         = Type;
-  BootEntry->SystemAction = Action;
 
   RegisterBootOption (
     BootContext,
@@ -1677,10 +1634,9 @@ CreateFileSystemForCustom (
 
   DEBUG ((
     DEBUG_INFO,
-    "OCB: Adding fs %p for %u custom entries%a%a\n",
+    "OCB: Adding fs %p for %u custom entries and BEP%a\n",
     OC_CUSTOM_FS_HANDLE,
     BootContext->PickerContext->AllCustomEntryCount,
-    BootContext->PickerContext->ShowNvramReset ? " and nvram reset" : "",
     BootContext->PickerContext->HideAuxiliary ? " (aux hidden)" : " (aux shown)"
     ));
 
@@ -1702,7 +1658,6 @@ AddFileSystemEntryForCustom (
   EFI_STATUS  ReturnStatus;
   EFI_STATUS  Status;
   UINTN       Index;
-  UINT32      CsrActiveConfig;
 
   ReturnStatus = EFI_NOT_FOUND;
 
@@ -1719,39 +1674,6 @@ AddFileSystemEntryForCustom (
                FileSystem,
                &BootContext->PickerContext->CustomEntries[Index],
                FALSE
-               );
-
-    if (!EFI_ERROR (Status)) {
-      ReturnStatus = EFI_SUCCESS;
-    }
-  }
-
-  if (BootContext->PickerContext->ShowToggleSip) {
-    Status = OcGetSip (&CsrActiveConfig, NULL);
-    if (!EFI_ERROR (Status) || (Status == EFI_NOT_FOUND)) {
-      Status = AddBootEntryFromSystemEntry (
-                 BootContext,
-                 FileSystem,
-                 OcIsSipEnabled (Status, CsrActiveConfig) ? OC_MENU_SIP_IS_ENABLED : OC_MENU_SIP_IS_DISABLED,
-                 OC_BOOT_TOGGLE_SIP,
-                 OC_FLAVOUR_TOGGLE_SIP,
-                 InternalSystemActionToggleSip
-                 );
-
-      if (!EFI_ERROR (Status)) {
-        ReturnStatus = EFI_SUCCESS;
-      }
-    }
-  }
-
-  if (BootContext->PickerContext->ShowNvramReset) {
-    Status = AddBootEntryFromSystemEntry (
-               BootContext,
-               FileSystem,
-               OC_MENU_RESET_NVRAM_ENTRY,
-               OC_BOOT_RESET_NVRAM,
-               OC_FLAVOUR_RESET_NVRAM,
-               InternalSystemActionResetNvram
                );
 
     if (!EFI_ERROR (Status)) {
@@ -2418,7 +2340,7 @@ OcLoadBootEntry (
 
   if ((BootEntry->Type & OC_BOOT_SYSTEM) != 0) {
     ASSERT (BootEntry->SystemAction != NULL);
-    return BootEntry->SystemAction ();
+    return BootEntry->SystemAction (BootEntry->ActionConfig);
   }
 
   Status = InternalLoadBootEntry (
